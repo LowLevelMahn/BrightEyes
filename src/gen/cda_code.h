@@ -1,4 +1,4 @@
-#if defined(__BORLANDC__)
+#if defined(__BORLANDC__) || defined(__WATCOMC__)
 /* used by external modules */
 void CD_enable_repeat(void);
 void CD_audio_stop(void);

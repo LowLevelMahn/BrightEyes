@@ -15,7 +15,7 @@ void vgalib_copy_to_screen_nonzero(unsigned char*, unsigned char*, const int, co
 void vgalib_screen_copy(unsigned char*, unsigned char*, const int, const int);
 void vgalib_copy_from_screen(unsigned char*, unsigned char*, const int, const int);
 
-#if defined(__BORLANDC__)
+#if defined(__BORLANDC__) || defined(__WATCOMC__)
 void set_video_mode(unsigned short);
 void set_video_page(unsigned short);
 void save_display_stat(signed short*);

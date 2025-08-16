@@ -18,12 +18,44 @@
 #define IS_UNUSED
 #endif
 
-#if defined(__BORLANDC__)
+#if defined(__BORLANDC__) || defined(__WATCOMC__)
 #include <IO.H>		// lseek, _read, _close, open, write
 #include <DOS.H>
 #include <BIOS.H>	// bioskey, int86x()
 #include <CONIO.H>	// clrscr()
-#include <ALLOC.H>	// farcalloc()
+
+#if defined(__BORLANDC__)
+#include <ALLOC.H> // farcalloc()
+#else
+#include <malloc.h>	
+
+#define farcalloc _fcalloc
+#define getvect _dos_getvect
+#define setvect _dos_setvect
+#define outportb _outp
+#define inportb _inp
+
+int bioskey(int flush) {
+  if (flush == 0) {
+    /* Check if a key is pressed, non-blocking */
+    return kbhit() ? 1 : 0;
+  } else {
+    /* Read and remove the key from the buffer, blocking */
+    int ch = getch();
+    return ch & 0xFF;  // returns ASCII value similar to Borland
+  }
+}
+
+void clrscr(void) {
+  union REGS regs;
+  regs.h.ah = 0x06;    // Scroll Window Up
+  regs.h.al = 0;       // Clear entire page
+  regs.h.ch = 0; regs.h.cl = 0;       // Upper-left corner
+  regs.h.dh = 24; regs.h.dl = 79;     // Lower-right corner (25x80 text)
+  int86(0x10, &regs, &regs);
+}
+
+#endif
 #include <MATH.H>	// abs()
 
 #include "cda_code.h"
@@ -47,7 +79,7 @@
 #include "vgalib.h"
 
 /* portable Memory Access */
-#if !defined(__BORLANDC__)
+#if !defined(__BORLANDC__) && !defined(__WATCOMC__)
 static inline signed short readws(const unsigned char *p) { return *(const signed short*)p; }
 static inline unsigned int readd(const unsigned char *p) { return *(const unsigned int*)p; }
 static inline signed int readds(const unsigned char *p) { return *(const signed int*)p; }
@@ -58,7 +90,7 @@ static inline signed int readds(const unsigned char *p) { return *(const signed 
 #define readds(p) (*(const signed long*)(p))
 #endif
 
-#if !defined(__BORLANDC__)
+#if !defined(__BORLANDC__) && !defined(__WATCOMC__)
 // DUMMY for BCC CLib func
 
 static unsigned short gen_rotl(unsigned short op, unsigned short count)
@@ -927,7 +959,7 @@ static unsigned short g_mouse_mask[32] = {
         0x001c, 0x0008, 0x0000, 0x0000,
 };
 
-#if !defined(__BORLANDC__)
+#if !defined(__BORLANDC__) && !defined(__WATCOMC__)
 static SDL_Cursor *g_sdl_cursor = NULL;
 static Uint8 *g_sdl_cursor_data_r = NULL;
 static Uint8 *g_sdl_cursor_mask_r = NULL;
@@ -1098,7 +1130,7 @@ static signed long g_gendat_offset;
 static signed long g_flen;
 
 static const char g_str_chr[] = ".CHR";
-#if defined(__BORLANDC__) || defined(_WIN32)
+#if defined(__BORLANDC__) || defined(__WATCOMC__) || defined(_WIN32)
 static const char g_str_temp_dir[] = "TEMP\\";
 #endif
 static char g_str_save_error_de[] = "@SPEICHER FEHLER!@EVENTUELL DISKETTE GESCH\x9aTZT?";
@@ -1359,7 +1391,7 @@ static unsigned char g_pal_roalogo[768];
 /* FORMERLY END OF INITIALIZED GLOBAL VARIABLES _DATA */
 
 /* FORMERLY START OF UNINITIALIZE GLOBAL VARIABLE _BSS DS:0x2474*/
-#if defined(__BORLANDC__)
+#if defined(__BORLANDC__) || defined(__WATCOMC__)
 static signed short g_display_mode_bak;
 static signed short g_display_page_bak;
 #endif
@@ -1397,7 +1429,7 @@ static signed short g_in_key_ext;
 static signed short g_in_key_ascii;
 
 static char* g_texts[301];
-#if !defined(__BORLANDC__)
+#if !defined(__BORLANDC__) && !defined(__WATCOMC__)
 /* usage: output */
 static inline char* get_text(signed short no) {
 	return g_texts[no];
@@ -1424,7 +1456,7 @@ static signed char g_in_intro;
 
 static volatile struct struct_hero g_hero = {0};
 
-#if !defined(__BORLANDC__)
+#if !defined(__BORLANDC__) && !defined(__WATCOMC__)
 static unsigned char* g_bg_buffer[]       = {NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL};
 #endif
 static unsigned char *g_typus_buffer[]    = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
@@ -1460,7 +1492,7 @@ signed short g_called_with_args;
 enum e_music { MUSIC_OFF = 0, MUSIC_CDA = 1, MUSIC_XMID = 2, MUSIC_AWS = 3};
 static int g_music = MUSIC_CDA; /* default is CDA/FLAC */
 
-#if defined(__BORLANDC__)
+#if defined(__BORLANDC__) || defined(__WATCOMC__)
 static const char g_str_sound_cfg[] = "SOUND.CFG";
 static const char g_str_sound_adv[] = "SOUND.ADV";
 static char g_str_soundhw_not_found[] = "SOUND HARDWARE NOT FOUND!";
@@ -1489,7 +1521,7 @@ static Mix_Music *music = NULL;
 #endif
 
 /* TIMER VARIABLES */
-#if defined(__BORLANDC__)
+#if defined(__BORLANDC__) || defined(__WATCOMC__)
 void far *g_irq78_bak;
 void far *g_timer_isr_bak;
 #else
@@ -1523,7 +1555,7 @@ static signed short g_random_gen_seed2 = 0;
 static unsigned char *gen_alloc(unsigned long nelem)
 {
 	unsigned char *p;
-#if defined(__BORLANDC__)
+#if defined(__BORLANDC__) || defined(__WATCOMC__)
 	p = (unsigned char*)farcalloc(nelem, 1);
 #else
 	p = (unsigned char*)calloc(nelem, 1);
@@ -1565,7 +1597,7 @@ static int alloc_buffers(void)
 {
 	int errors = 0;
 
-#if defined(__BORLANDC__)
+#if defined(__BORLANDC__) || defined(__WATCOMC__)
 	g_vga_memstart = (unsigned char*)MK_FP(0xa000, 0x0);
 #else
 	g_vga_memstart = (unsigned char*)calloc(O_WIDTH * O_HEIGHT, 1);
@@ -1618,7 +1650,7 @@ static int alloc_buffers(void)
 	g_mr_bar = gen_alloc(1024);
 	if (g_mr_bar == NULL) errors++;
 
-#if !defined(__BORLANDC__)
+#if !defined(__BORLANDC__) && !defined(__WATCOMC__)
 	for (int i = 0; i <= 10; i++) {
 		g_bg_buffer[i] = gen_alloc(O_WIDTH * O_HEIGHT);
 		if (g_bg_buffer[i] == NULL) errors++;
@@ -1640,7 +1672,7 @@ void free_buffers(void)
 	int i;
 
 	if (g_vga_memstart) {
-#if !defined(__BORLANDC__)
+#if !defined(__BORLANDC__) && !defined(__WATCOMC__)
 		gen_free(g_vga_memstart);
 #endif
 		g_vga_memstart = NULL;
@@ -1722,7 +1754,7 @@ void free_buffers(void)
 		g_vga_backbuffer = NULL;
 	}
 
-#if defined(__BORLANDC__)
+#if defined(__BORLANDC__) || defined(__WATCOMC__)
 	if (g_snd_timbre_cache != NULL) {
 		gen_free(g_snd_timbre_cache);
 		g_snd_timbre_cache = NULL;
@@ -1744,7 +1776,7 @@ void free_buffers(void)
 	}
 #endif
 
-#if !defined(__BORLANDC__)
+#if !defined(__BORLANDC__) && !defined(__WATCOMC__)
 	for (i = 0; i <= 10; i++) {
 		if (g_bg_buffer[i] != NULL) {
 			gen_free(g_bg_buffer[i]);
@@ -1815,7 +1847,7 @@ static int is_in_word_array(const int val, const signed short *p)
 
 /* MOUSE MANAGEMENT */
 
-#if defined(__BORLANDC__)
+#if defined(__BORLANDC__) || defined(__WATCOMC__)
 /**
  * mouse_action -	does mouse programming
  * @p1:		function AX
@@ -1871,9 +1903,15 @@ static void do_mouse_action(unsigned short *p1, unsigned short *p2, unsigned sho
 	}
 }
 
+#if defined(__BORLANDC__)
 static void interrupt mouse_isr(void)
 {
 	signed short l_si = _AX;
+#elif defined(__WATCOMC__)
+static void interrupt mouse_isr(union REGS *regs)
+{
+	signed short l_si = regs->x.ax;
+#endif
 	unsigned short p1;
 	unsigned short p2;
 	unsigned short p3;
@@ -1947,7 +1985,7 @@ static void mouse_do_enable(const signed short val, unsigned char* ptr)
 }
 #endif
 
-#if !defined(__BORLANDC__)
+#if !defined(__BORLANDC__) && !defined(__WATCOMC__)
 static void sdl_mouse_cursor_scaled(void)
 {
 	unsigned char src_m[16*16];
@@ -2042,7 +2080,7 @@ static void mouse_enable(void)
 {
 	if (g_have_mouse == 2) {
 
-#if defined(__BORLANDC__)
+#if defined(__BORLANDC__) || defined(__WATCOMC__)
 		unsigned short p1, p2, p3, p4, p5;
 
 		/* initialize mouse */
@@ -2114,7 +2152,7 @@ static void mouse_enable(void)
 void mouse_disable(void)
 {
 	if (g_have_mouse == 2) {
-#if defined(__BORLANDC__)
+#if defined(__BORLANDC__) || defined(__WATCOMC__)
 		unsigned short p1, p2, p3, p4, p5;
 
 		/* restore the old int 0x78 handler */
@@ -2148,7 +2186,7 @@ void mouse_disable(void)
  */
 static void mouse_move_cursor(const signed short x, const signed short y)
 {
-#if defined(__BORLANDC__)
+#if defined(__BORLANDC__) || defined(__WATCOMC__)
 	unsigned short p1, p2, p3, p4, p5;
 
 	p1 = 4;
@@ -2164,7 +2202,7 @@ static void mouse_move_cursor(const signed short x, const signed short y)
 
 static void mouse_cursor_draw(void)
 {
-#if defined(__BORLANDC__)
+#if defined(__BORLANDC__) || defined(__WATCOMC__)
 	unsigned char *vgaptr;
 	signed short *cursor;
 	signed short rangeX;
@@ -2201,7 +2239,7 @@ static void mouse_cursor_draw(void)
 
 static void mouse_save_bg(void)
 {
-#if defined(__BORLANDC__)
+#if defined(__BORLANDC__) || defined(__WATCOMC__)
 	unsigned char *vgaptr;
 	signed short rangeX;
 	signed short rangeY;
@@ -2228,7 +2266,7 @@ static void mouse_save_bg(void)
 
 static void mouse_restore_bg(void)
 {
-#if defined(__BORLANDC__)
+#if defined(__BORLANDC__) || defined(__WATCOMC__)
 	unsigned char *vgaptr;
 	signed short rangeX;
 	signed short rangeY;
@@ -2511,7 +2549,7 @@ static signed long process_nvf(struct nvf_desc *nvf)
 
 /* KEYBOARD AND INPUT MANAGEMENT */
 
-#if !defined(__BORLANDC__)
+#if !defined(__BORLANDC__) && !defined(__WATCOMC__)
 static int g_sdl_quit_event = 0;
 
 static int sdl_event_loop(const int cmd)
@@ -2624,7 +2662,7 @@ static int sdl_event_loop(const int cmd)
 
 static void wait_for_vsync(void)
 {
-#if defined(__BORLANDC__)
+#if defined(__BORLANDC__) 
 	outportb(0x3d4, 0x11);
 	_AL = inportb(0x3d5);
 	_AH = 0;
@@ -2644,6 +2682,23 @@ static void wait_for_vsync(void)
 		_AH = 0;
 		_BX = _AX;
 	} while (!(_BX & 0x8));
+#elif defined(__WATCOMC__)
+	uint8_t val;
+
+	outportb(0x3D4, 0x11);
+	val = inportb(0x3D5);
+	val &= 0xDF;  // clear bit 5
+
+	outportb(0x3D4, 0x11);
+	outportb(0x3D5, val);
+
+	do {
+		val = inportb(0x3DA);
+	} while (val & 0x08);  // bit 3 = vertical retrace active?
+
+	do {
+		val = inportb(0x3DA);
+	} while (!(val & 0x08));  
 #else
 	// wait 16ms
 	SDL_Delay(16);
@@ -2652,7 +2707,7 @@ static void wait_for_vsync(void)
 
 static signed short get_bioskey(const int cmd)
 {
-#if !defined(__BORLANDC__)
+#if !defined(__BORLANDC__) && !defined(__WATCOMC__)
 	if (cmd == 0) {
 		// return the pressed key imediately
 		int keycode = sdl_event_loop(0);
@@ -2669,7 +2724,7 @@ static signed short get_bioskey(const int cmd)
 
 static void flush_keyboard_queue(void)
 {
-#if defined(__BORLANDC__)
+#if defined(__BORLANDC__) || defined(__WATCOMC__)
 	while (get_bioskey(1)) {
 		get_bioskey(0);
 	}
@@ -2817,11 +2872,11 @@ static signed short open_datfile(const signed short index)
 	signed long gendat_offset;
 	int handle;
 
-#if defined(__BORLANDC__)
+#if defined(__BORLANDC__) || defined(__WATCOMC__)
 	flushall();
 #endif
 
-#if defined(__BORLANDC__) || defined(_WIN32)
+#if defined(__BORLANDC__) || defined(__WATCOMC__) || defined(_WIN32)
 	/* 0x8001 = O_BINARY | O_RDONLY */
 	handle = open(g_str_dsagen_dat, O_BINARY | O_RDONLY);
 #else
@@ -2913,7 +2968,7 @@ static int detect_datfile(void)
 	int retval = 0;
 	char textbuffer[80];
 
-#if defined(__BORLANDC__) || defined(_WIN32)
+#if defined(__BORLANDC__) || defined(__WATCOMC__) || defined(_WIN32)
 	/* 0x8001 = O_BINARY | O_RDONLY */
 	handle = open(g_str_dsagen_dat, O_BINARY | O_RDONLY);
 #else
@@ -3123,7 +3178,7 @@ static void load_common_files(void)
  */
 static void load_page(const int page)
 {
-#if !defined(__BORLANDC__)
+#if !defined(__BORLANDC__) && !defined(__WATCOMC__)
 	if ((0 <= page) && (page <= 10)) {
 
 		memcpy(g_vga_backbuffer, g_bg_buffer[page], O_WIDTH * O_HEIGHT);
@@ -3147,7 +3202,7 @@ static void load_page(const int page)
 #endif
 }
 
-#if !defined(__BORLANDC__)
+#if !defined(__BORLANDC__) && !defined(__WATCOMC__)
 /**
  * \brief buffer and prepare all background images
  * \note only on newer systems with enough memory
@@ -3260,7 +3315,7 @@ static void init_colors(void)
  */
 static void init_video(void)
 {
-#if defined(__BORLANDC__)
+#if defined(__BORLANDC__) || defined(__WATCOMC__)
 	save_display_stat(&g_display_page_bak);
 
 	/* set the video mode to 320x200 8bit */
@@ -3277,7 +3332,7 @@ static void init_video(void)
  */
 void exit_video(void)
 {
-#if defined(__BORLANDC__)
+#if defined(__BORLANDC__) || defined(__WATCOMC__)
 	/* restore old mode */
 	set_video_mode(g_display_mode_bak);
 	/* restore old page */
@@ -3612,7 +3667,7 @@ static void print_str(const char *str, const signed short x_in, const signed sho
 		}
 	}
 
-#if !defined(__BORLANDC__)
+#if !defined(__BORLANDC__) && !defined(__WATCOMC__)
 	if (g_gfx_ptr == g_vga_memstart)
 		sdl_forced_update();
 #endif
@@ -3681,7 +3736,7 @@ static signed short enter_string(char *dst, const signed short x, const signed s
 		print_chr('_', x_pos, y);
 	}
 
-#if !defined(__BORLANDC__)
+#if !defined(__BORLANDC__) && !defined(__WATCOMC__)
 	if (g_gfx_ptr == g_vga_memstart)
 		sdl_forced_update();
 #endif
@@ -3788,7 +3843,7 @@ static signed short enter_string(char *dst, const signed short x, const signed s
 			}
 		}
 
-#if !defined(__BORLANDC__)
+#if !defined(__BORLANDC__) && !defined(__WATCOMC__)
 	if (g_gfx_ptr == g_vga_memstart)
 		sdl_forced_update();
 #endif
@@ -4097,7 +4152,7 @@ signed short gui_radio(char *header, const signed int options, ...)
 		g_action_table = g_action_input;
 		handle_input();
 
-#if !defined(__BORLANDC__)
+#if !defined(__BORLANDC__) && !defined(__WATCOMC__)
 		/* check if SDL got a quit event set by handle_input() */
 		if (g_sdl_quit_event) {
 			/* mimic an ESC to return from gui_radio() */
@@ -4109,7 +4164,7 @@ signed short gui_radio(char *header, const signed int options, ...)
 		g_action_table = NULL;
 
 		if (l_opt_bak != l_opt_new) {
-#if !defined(__BORLANDC__)
+#if !defined(__BORLANDC__) && !defined(__WATCOMC__)
 			if (l_opt_new < 1) {
 				/* select the first option */
 				l_opt_new = 1;
@@ -4123,7 +4178,7 @@ signed short gui_radio(char *header, const signed int options, ...)
 			l_opt_bak = l_opt_new;
 		}
 
-#if !defined(__BORLANDC__)
+#if !defined(__BORLANDC__) && !defined(__WATCOMC__)
 		SDL_Delay(25);
 #endif
 
@@ -4213,7 +4268,7 @@ static signed short gui_bool(char *header)
 }
 
 /* AIL MANAGEMENT */
-#if defined(__BORLANDC__)
+#if defined(__BORLANDC__) || defined(__WATCOMC__)
 static unsigned char *load_snd_driver(const char *fname)
 {
 	signed long size;
@@ -4331,7 +4386,7 @@ static signed short load_seq(const signed short sequence_num)
 				if ((src_ptr = get_timbre(bank, patch = (answer & 0xff))) != 0) {
 					/* ptr is passed differently */
 					AIL_install_timbre(g_snd_driver_handle, bank, patch, src_ptr);
-					gen_free(src_ptr);
+					gen_free((unsigned char*)src_ptr);
 				}
 			}
 			/* Remark: set g_handle_timbre to 0 after close() */
@@ -4382,7 +4437,7 @@ static void stop_sequence(void)
 
 static void restart_midi(void)
 {
-#if defined(__BORLANDC__)
+#if defined(__BORLANDC__) || defined(__WATCOMC__)
 	if ((g_music == MUSIC_XMID) && (readw(g_snd_driver_desc + 0x02) == 3) &&
 		(AIL_sequence_status(g_snd_driver_handle, g_snd_sequence) == 2))
 	{
@@ -4391,7 +4446,7 @@ static void restart_midi(void)
 #endif
 }
 
-#if defined(__BORLANDC__)
+#if defined(__BORLANDC__) || defined(__WATCOMC__)
 static void play_midi(const signed short index)
 {
 	if ((g_music == MUSIC_XMID) && (readw(g_snd_driver_desc + 0x02) == 3))
@@ -4405,7 +4460,7 @@ static void play_midi(const signed short index)
 
 static void start_music(const signed short track)
 {
-#if defined(__BORLANDC__)
+#if defined(__BORLANDC__) || defined(__WATCOMC__)
 	if (g_music == MUSIC_XMID) {
 		play_midi(track);
 	} else if (g_music == MUSIC_CDA) {
@@ -4435,7 +4490,7 @@ static void start_music(const signed short track)
 
 static void init_music(void)
 {
-#if defined(__BORLANDC__)
+#if defined(__BORLANDC__) || defined(__WATCOMC__)
 
 	if (g_music != MUSIC_OFF) {
 
@@ -4493,7 +4548,7 @@ static void init_music(void)
 /* Remark: used by CD-Audio code => extern */
 void exit_music(void)
 {
-#if defined(__BORLANDC__)
+#if defined(__BORLANDC__) || defined(__WATCOMC__)
 	if (g_music == MUSIC_XMID) {
 		AIL_shutdown(NULL);
 	} else if (g_music == MUSIC_CDA) {
@@ -4515,7 +4570,7 @@ void exit_music(void)
 
 /* TIMER MANAGEMENT */
 /* Intel 8253 ticks every 55 ms */
-#if defined(__BORLANDC__)
+#if defined(__BORLANDC__) || defined(__WATCOMC__)
 static void interrupt timer_isr(void)
 {
 	/* update RNG seed */
@@ -4562,7 +4617,7 @@ static Uint32 gen_timer_isr(Uint32 interval, IS_UNUSED void* param)
 
 static void set_timer_isr(void)
 {
-#if defined(__BORLANDC__)
+#if defined(__BORLANDC__) || defined(__WATCOMC__)
 	/* save adress of the old ISR */
 	g_timer_isr_bak = ((void interrupt far (*)(void))getvect(0x1c));
 	/* set a the new one */
@@ -4593,7 +4648,7 @@ static void set_timer_isr(void)
 
 void restore_timer_isr(void)
 {
-#if defined(__BORLANDC__)
+#if defined(__BORLANDC__) || defined(__WATCOMC__)
 	setvect(0x1c, (void interrupt far (*)(void))g_timer_isr_bak);
 #else
 	if (SDL_LockMutex(g_sdl_timer_mutex) == 0) {
@@ -4674,7 +4729,7 @@ static void save_chr(volatile struct struct_hero *hero)
 	filename[8] = 0;
 	strcat(filename, g_str_chr);
 
-#if defined(__BORLANDC__) || defined(_WIN32)
+#if defined(__BORLANDC__) || defined(__WATCOMC__) || defined(_WIN32)
 	/* 0x8001 = O_BINARY | O_RDONLY */
 	handle = open(filename, O_BINARY | O_RDONLY);
 #else
@@ -4690,6 +4745,8 @@ static void save_chr(volatile struct struct_hero *hero)
 
 #if defined(__BORLANDC__)
 		handle = open(filename, O_BINARY | _O_WRITABLE | O_TRUNC | O_CREAT | O_DENYNONE | O_RDWR, S_IREAD | S_IWRITE);
+#elif defined(__WATCOMC__)    
+		handle = open(filename, O_BINARY | O_RDWR | O_CREAT | O_TRUNC, S_IREAD | S_IWRITE);
 #elif  defined(_WIN32)
 		handle = _open(filename, (_O_BINARY | _O_CREAT | _O_TRUNC | _O_WRONLY), _S_IWRITE);
 #else
@@ -4712,6 +4769,10 @@ static void save_chr(volatile struct struct_hero *hero)
 			strncpy(path, g_str_temp_dir, 20);
 			strcat(path, filename);
 			handle = open(filename, O_BINARY | _O_WRITABLE | O_TRUNC | O_CREAT | O_DENYNONE | O_RDWR, S_IREAD | S_IWRITE);
+#elif defined(__WATCOMC__)      
+			strncpy(path, g_str_temp_dir, 20);
+			strcat(path, filename);
+			handle = open(filename, O_BINARY | O_TRUNC | O_CREAT | O_RDWR, S_IREAD | S_IWRITE);
 #elif defined(_WIN32)
 			strncpy(path, g_str_temp_dir, 20);
 			strcat(path, filename);
@@ -4843,7 +4904,7 @@ static void refresh_background(volatile struct struct_hero *hero, const int page
 			vgalib_copy_to_screen(get_gfx_ptr(305, 7), src, 16, 16);
 		}
 
-#if defined(__BORLANDC__)
+#if defined(__BORLANDC__) || defined(__WATCOMC__)
 		if (g_dsagen_lang == LANG_DE) {
 			/* copy arrow_area to backbuffer */
 			vgalib_copy_to_screen(get_gfx_ptr(145, 178), g_arrow_area, 170, 20);
@@ -5052,14 +5113,14 @@ static void print_values(volatile struct struct_hero *hero, const int page, cons
 
 	refresh_background(hero, page, level);
 
-#if defined(__BORLANDC__)
+#if defined(__BORLANDC__) || defined(__WATCOMC__)
 	/* copy the complete backbuffer to the screen */
 	mouse_bg();
 	vgalib_copy_to_screen(g_vga_memstart, g_vga_backbuffer, O_WIDTH, O_HEIGHT);
 	mouse_cursor();
 #endif
 
-#if !defined(__BORLANDC__)
+#if !defined(__BORLANDC__) && !defined(__WATCOMC__)
 	unsigned char *p = calloc(O_WIDTH * O_HEIGHT, 1);
 	unsigned char *gfx_bak = g_gfx_ptr;
 
@@ -5368,7 +5429,7 @@ static void print_values(volatile struct struct_hero *hero, const int page, cons
 		sprintf(tmp, "%d", hero->spell_incs); print_str(tmp, 217, 184);
 	}
 
-#if !defined(__BORLANDC__)
+#if !defined(__BORLANDC__) && !defined(__WATCOMC__)
 	if (p != NULL) {
 		/* copy the complete backbuffer to the screen */
 		mouse_bg();
@@ -7013,7 +7074,7 @@ static int choose_typus(volatile struct struct_hero *hero, const int level)
 		hero->attrib[i].current = randval;
 	}
 
-#if !defined(__BORLANDC__)
+#if !defined(__BORLANDC__) && !defined(__WATCOMC__)
 	fprintf(stderr, "choose_typus() initial attribute values\n");
 	for (i = 0; i < 14; i++)
 		fprintf(stderr, "\t%s = %d\n", get_text(i + 32), hero->attrib[i].normal);
@@ -7036,7 +7097,7 @@ static int choose_typus(volatile struct struct_hero *hero, const int level)
 		is_upper = (value & 0x80) ? 1 : 0;
 		v = (value & 0x7f);
 
-#if !defined(__BORLANDC__)
+#if !defined(__BORLANDC__) && !defined(__WATCOMC__)
 		fprintf(stderr, "\t%s %c= %d\n", get_text(att + 32), is_upper ? '<' : '>', v);
 #endif
 		if (is_upper) {
@@ -7271,7 +7332,7 @@ static void do_gen(volatile struct struct_hero *hero, const int init_level)
 				}
 			}
 		}
-#if !defined(__BORLANDC__)
+#if !defined(__BORLANDC__) && !defined(__WATCOMC__)
 		SDL_Delay(75);
 		if (g_sdl_quit_event) done = 1;
 #endif
@@ -7717,7 +7778,7 @@ int main(int argc, char** argv)
 
 	load_common_files();
 
-#if !defined(__BORLANDC__)
+#if !defined(__BORLANDC__) && !defined(__WATCOMC__)
 	load_pages();
 
 	SDL_ShowCursor(SDL_ENABLE);
@@ -7730,7 +7791,7 @@ int main(int argc, char** argv)
 	/* ask for level */
 	while (l_level == -1) {
 		l_level = gui_radio(get_text(0), 2, get_text(1), get_text(2));
-#if !defined(__BORLANDC__)
+#if !defined(__BORLANDC__) && !defined(__WATCOMC__)
 		if (g_sdl_quit_event) return 0;
 #endif
 	}
@@ -7741,7 +7802,7 @@ int main(int argc, char** argv)
 		exit_music();
 	}
 
-#if defined(__BORLANDC__)
+#if defined(__BORLANDC__) || defined(__WATCOMC__)
 	mouse_bg();
 #endif
 

@@ -15,7 +15,7 @@
 #include <stdio.h> // fprintf, NULL
 
 typedef unsigned char uint8;
-#if !defined(__BORLANDC__)
+#if !defined(__BORLANDC__) && !defined(__WATCOMC__)
 typedef unsigned int uint32;
 #else
 typedef unsigned long uint32;
@@ -130,7 +130,7 @@ void decomp_pp20(unsigned char *dst, unsigned char *src, signed long plen)
 	if (unplen == 0) {
 		fprintf(stderr, "PP20: No PP20 file\n");
 	}
-#if defined(__BORLANDC__)
+#if defined(__BORLANDC__) || defined(__WATCOMC__)
 //	ppDecrunch(&src[8],  dst, &src[4], plen - 12, unplen, src[plen -1]);
 #else
 	ppDecrunch(&src[8],  dst, &src[4], plen - 12, unplen, src[plen -1]);

@@ -6,7 +6,7 @@
  *	These functions were written in assembler and are
  *      just a clean C-implementation.
 */
-#if !defined(__BORLANDC__)
+#if !defined(__BORLANDC__) && !defined(__WATCOMC__)
 #include <SDL.h>
 #endif
 
@@ -20,7 +20,7 @@
 
 #include "vgalib.h"
 
-#if !defined(__BORLANDC__)
+#if !defined(__BORLANDC__) && !defined(__WATCOMC__)
 extern unsigned char *g_vga_memstart;
 
 enum { DEF_RATIO = 3 };
@@ -380,7 +380,7 @@ void set_palette(const unsigned char *pointer, const unsigned char first_color, 
 }
 #endif
 
-#if defined(__BORLANDC__)
+#if defined(__BORLANDC__) && defined(__WATCOMC__)
 void set_video_mode(unsigned short mode)
 {
 	asm {
@@ -516,7 +516,7 @@ void vgalib_fill_rect(unsigned char *dst_in, const int color, const int width, c
 		}
 	}
 
-#if !defined(__BORLANDC__)
+#if !defined(__BORLANDC__) && !defined(__WATCOMC__)
 	/* check if its really the vga memory, dst can also be another buffer */
 	const int offset = dst_in - g_vga_memstart;
 	if ((0 <= offset) && (offset <= O_WIDTH * O_HEIGHT)) {
@@ -555,7 +555,7 @@ void vgalib_copy_to_screen(unsigned char *dst_in, unsigned char *src_in, const i
 		}
 	}
 
-#if !defined(__BORLANDC__)
+#if !defined(__BORLANDC__) && !defined(__WATCOMC__)
 	/* check if its really the vga memory, dst can also be another buffer */
 	const int offset = dst_in - g_vga_memstart;
 	if ((0 <= offset) && (offset <= O_WIDTH * O_HEIGHT)) {
@@ -591,7 +591,7 @@ void vgalib_copy_to_screen_bounded(unsigned char *dst_in, unsigned char *src_in,
 		src += width;
 	}
 
-#if !defined(__BORLANDC__)
+#if !defined(__BORLANDC__) && !defined(__WATCOMC__)
 	/* check if its really the vga memory, dst can also be another buffer */
 	const int offset = dst_in - g_vga_memstart;
 	if ((0 <= offset) && (offset <= O_WIDTH * O_HEIGHT)) {
@@ -627,7 +627,7 @@ void vgalib_copy_to_screen_nonzero(unsigned char *dst_in, unsigned char *src_in,
 		src += width;
 	}
 
-#if !defined(__BORLANDC__)
+#if !defined(__BORLANDC__) && !defined(__WATCOMC__)
 	/* check if its really the vga memory, dst can also be another buffer */
 	const int offset = dst_in - g_vga_memstart;
 	if ((0 <= offset) && (offset <= O_WIDTH * O_HEIGHT)) {
@@ -659,7 +659,7 @@ void vgalib_screen_copy(unsigned char *dst_in, unsigned char *src_in, const int 
 		src += O_WIDTH;
 	}
 
-#if !defined(__BORLANDC__)
+#if !defined(__BORLANDC__) && !defined(__WATCOMC__)
 	/* check if its really the vga memory, dst can also be another buffer */
 	const int offset = dst_in - g_vga_memstart;
 	if ((0 <= offset) && (offset <= O_WIDTH * O_HEIGHT)) {

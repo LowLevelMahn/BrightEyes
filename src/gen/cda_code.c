@@ -22,7 +22,7 @@
  *
  */
 
-#if defined(__BORLANDC__)
+#if defined(__BORLANDC__) || defined(__WATCOMC__)
 
 #include <stdio.h>
 #include <string.h>
@@ -32,6 +32,32 @@
 #include <IO.H>		// lseek()
 #include <BIOS.H>	// bioskey()
 #include <CONIO.H>	// clrsrc()
+
+#if defined(__WATCOMC__)
+
+#define hardresume _hardresume
+
+int bioskey(int flush) {
+  if (flush == 0) {
+    /* Check if a key is pressed, non-blocking */
+    return kbhit() ? 1 : 0;
+  } else {
+    /* Read and remove the key from the buffer, blocking */
+    int ch = getch();
+    return ch & 0xFF;  // returns ASCII value similar to Borland
+  }
+}
+
+void clrscr(void) {
+  union REGS regs;
+  regs.h.ah = 0x06;    // Scroll Window Up
+  regs.h.al = 0;       // Clear entire page
+  regs.h.ch = 0; regs.h.cl = 0;       // Upper-left corner
+  regs.h.dh = 24; regs.h.dl = 79;     // Lower-right corner (25x80 text)
+  int86(0x10, &regs, &regs);
+}
+
+#endif
 
 /* initialized global variables DATA */
 static char cd_dummy0 = 2;
@@ -96,6 +122,14 @@ extern signed short gui_radio(char*, const signed int, ...);
 /* non-portable Memory Access */
 #define readws(p) (*(const signed short*)(p))
 
+#if defined(__BORLANDC__)
+#define ASM asm
+#elif defined(__WATCOMC__)
+#define ASM __asm
+#else
+#error not supported compiler
+#endif
+
 /**
  * \brief check if CD-Drives are available
  *
@@ -103,7 +137,8 @@ extern signed short gui_radio(char*, const signed int, ...);
  */
 static signed short CD_has_drives(void)
 {
-	asm {
+	signed short result;
+	ASM {
 		mov ax, 0x1500
 		xor bx, bx
 		int 0x2f
@@ -112,9 +147,18 @@ static signed short CD_has_drives(void)
 		or  bx, bx
 		jz has_no_cd
 		inc ax
+#if defined(__BORLANDC__)
 	}
+	// Borland only allowes outer-asm labels
 has_no_cd:
-	return _AX;
+	ASM {
+#else
+	// ...Watcom only inner-asm lables
+has_no_cd:
+#endif
+		mov result,ax
+	}
+	return result;
 }
 
 /**
@@ -124,12 +168,14 @@ has_no_cd:
  */
 static signed short CD_count_drives(void)
 {
-	asm {
+	signed short result;
+	ASM {
 		mov ax, 0x1500
 		xor bx, bx
 		int 0x2f
+		mov result,bx
 	}
-	return _BX;
+	return result;
 
 }
 
@@ -140,13 +186,15 @@ static signed short CD_count_drives(void)
  */
 static signed short CD_get_first_drive(void)
 {
-	asm {
+	signed short result;
+	ASM {
 		mov ax, 0x1500
 		xor bx, bx
 		int 0x2f
+		mov result,cx
 	}
 
-	return _CX;
+	return result;
 }
 
 /**
@@ -165,7 +213,7 @@ static signed short CD_set_drive_no(void)
 
 static void CD_driver_request(struct driver_request far* request)
 {
-	asm {
+	ASM {
 		mov ax, 0x1510
 		mov cx, [g_cd_drive_no]
 		les bx, request
@@ -192,13 +240,17 @@ static void CD_unused1(void)
  */
 static signed long CD_get_tod(void)
 {
-	asm {
+	unsigned short reg_ax;
+	unsigned short reg_dx;
+	ASM {
 		mov ah, 0x0
 		int 0x1a
 		mov ax, dx
 		mov dx, cx
+		mov reg_ax,ax
+		mov reg_dx,dx
 	}
-	return ((signed long)_DX << 16) | _AX;
+	return ((signed long)reg_dx << 16) | reg_ax;
 }
 
 static void CD_audio_start_track(const signed short track_no)
